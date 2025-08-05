@@ -1,24 +1,20 @@
 # AI Trading Agent
 
-This repository implements a minimal **agent‑based trading framework**.  Each
-agent gathers a different type of information about a stock symbol and returns a
-structured JSON report.  The reports are combined into a trading strategy,
-backtested, and optionally saved to disk with any portfolio updates.
+This repository implements a minimal **agent‑based trading framework**.
+Agents query a language model for insights about a stock symbol and return a
+structured JSON report that can be consumed by downstream tools.
 
 ## Project Modules
 
 | Module / File | Purpose |
 | --- | --- |
-| `trading_bot/agents/technical_analysis.py` | Downloads price data from Yahoo Finance and computes EMA, RSI and MACD indicators. |
-| `trading_bot/agents/market_scanner.py` | Collects price, volume, VWAP, ATR and volatility metrics. |
-| `trading_bot/agents/social_media.py` | Performs keyword‑based sentiment analysis on sample posts. |
-| `trading_bot/agents/news_analyzer.py` | Analyses sample headlines for sentiment and returns key headlines. |
+| `trading_bot/agents/llm_agent.py` | Queries a language model for market commentary. |
 | `trading_bot/strategy.py` | Combines agent outputs into entry, sizing, risk and exit sections. |
 | `trading_bot/backtest.py` | Runs a simple buy‑and‑hold simulation to evaluate a strategy. |
 | `trading_bot/storage.py` | Persists agent outputs and strategies as JSON under a symbol/date tree. |
 | `trading_bot/portfolio.py` | Tracks open and closed positions and computes PnL. |
 | `trading_bot/scheduler.py` | Queues daily runs with APScheduler. |
-| `trading_bot/pipeline.py` | Orchestrates agents, strategy composition, backtesting and persistence. |
+| `trading_bot/pipeline.py` | Runs LLM agents and aggregates their outputs. |
 
 ## Agent Output
 
@@ -26,26 +22,17 @@ Every agent returns a JSON serialisable dictionary containing:
 
 - `agent`: name of the agent
 - `symbol`: the instrument analysed
-- `timestamp`: UTC time when the analysis was produced
-- method specific fields (e.g. `indicators_used`, `results`, `summary`,
-  `trend_signal`, `data_source`)
+- `summary`: brief conclusion from the model
+- `raw_response`: full text returned by the LLM
 
-Example response from the `TechnicalAnalysisAgent`:
+Example response from the `LLMAgent`:
 
 ```json
 {
-  "agent": "TechnicalAnalysisAgent",
+  "agent": "LLMAgent",
   "symbol": "TSLA",
-  "timestamp": "2025-01-01T08:00:00Z",
-  "indicators_used": ["ema_9", "rsi_14", "macd"],
-  "results": {
-    "ema_9": 250.3,
-    "rsi_14": 57.2,
-    "macd_hist": 1.24
-  },
-  "summary": "Trend is bullish with price above EMA and positive MACD crossover.",
-  "trend_signal": "bullish",
-  "data_source": "Yahoo Finance"
+  "summary": "Tesla shows growth potential this quarter.",
+  "raw_response": "Tesla's recent earnings beat expectations..."
 }
 ```
 
@@ -53,12 +40,9 @@ Example response from the `TechnicalAnalysisAgent`:
 
 For each configured symbol the pipeline performs:
 
-1. **Run agents** – gather technical, market, social and news data.
-2. **Compose strategy** – aggregate agent reports into a full trading plan
-   (entry, position sizing, risk management, exit and trade management).
-3. **Backtest** – simulate a simple buy‑and‑hold over the recent period.
-4. **Persist and update portfolio** – save agent outputs, strategy and backtest
-   results while recording any open or closed positions.
+1. **Run agents** – gather LLM-based commentary.
+2. Optionally feed the combined reports into separate strategy or backtesting
+   utilities.
 
 ## Step‑by‑Step Usage
 
@@ -73,40 +57,23 @@ For each configured symbol the pipeline performs:
    ```
 2. **Construct and run the pipeline**
    ```python
-   from trading_bot.agents import (
-       TechnicalAnalysisAgent, MarketScannerAgent,
-       SocialMediaAgent, NewsAnalyzerAgent,
-   )
+   from trading_bot.agents import LLMAgent
    from trading_bot.pipeline import Pipeline
-   from trading_bot.storage import JSONStorage
-   from trading_bot.portfolio import Portfolio
 
-   agents = [
-       TechnicalAnalysisAgent(),
-       MarketScannerAgent(),
-       SocialMediaAgent(),
-       NewsAnalyzerAgent(),
-   ]
+   agents = [LLMAgent()]
+   pipeline = Pipeline(agents=agents)
 
-   pipeline = Pipeline(agents=agents,
-                       storage=JSONStorage("data"),
-                       portfolio=Portfolio())
-
-   result = pipeline.run_for_symbol("TSLA")
-   print(result["strategy"])  # composed strategy dictionary
+   result = pipeline.run("TSLA")
+   print(result["reports"])  # list of agent outputs
    ```
 3. **Schedule a daily run**
    ```python
    from trading_bot.scheduler import schedule_daily_run
 
-   schedule_daily_run(pipeline, symbols=["TSLA", "AAPL"], hour=8, minute=0)
-   ```
-4. **Load historical strategies**
-   ```python
-   stored = pipeline.storage.load_strategy("TSLA", result["strategy"]["date"])
+   schedule_daily_run(pipeline.run, symbols=["TSLA", "AAPL"], run_time="08:00")
    ```
 
-These steps demonstrate the full workflow from data collection to persistence.
+These steps demonstrate the core workflow.
 
 ## Running tests
 
