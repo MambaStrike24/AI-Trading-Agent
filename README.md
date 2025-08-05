@@ -19,6 +19,8 @@ project structure includes:
   strategies and tracking open/closed positions.
 - **Daily scheduler** – helper using APScheduler to trigger the pipeline for a
   list of symbols at a configurable time.
+- **Pipeline** – convenience class that runs all agents, composes a strategy and
+  backtests it while optionally persisting outputs and updating a portfolio.
 
 The implementation is heavily simplified but follows the JSON schemas described
 in the project specification.
