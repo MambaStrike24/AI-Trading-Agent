@@ -7,9 +7,9 @@ from typing import Any
 
 import openai
 try:  # pragma: no cover - import path differs between OpenAI versions
-    from openai.error import OpenAIError
+    from openai.error import OpenAIError, RateLimitError
 except Exception:  # pragma: no cover
-    from openai import OpenAIError
+    from openai import OpenAIError, RateLimitError
 
 
 def call_openai(prompt: str, *, temperature: float = 0.7) -> str:
@@ -46,6 +46,8 @@ def call_openai(prompt: str, *, temperature: float = 0.7) -> str:
             messages=[{"role": "user", "content": prompt}],
             temperature=temperature,
         )
+    except RateLimitError as exc:
+        raise RuntimeError("OpenAI API rate limit exceeded") from exc
     except OpenAIError as exc:
         raise RuntimeError(f"OpenAI API error: {exc}") from exc
 

@@ -1,4 +1,4 @@
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 import os
 import types
 
@@ -28,3 +28,14 @@ def test_call_openai_raises_runtime_error_on_openaierror():
         with patch("openai.ChatCompletion.create", side_effect=OpenAIError("boom")):
             with pytest.raises(RuntimeError):
                 openai_client.call_openai("hi")
+
+
+def test_call_openai_raises_runtime_error_on_ratelimit():
+    class DummyRateLimitError(Exception):
+        pass
+
+    with patch.dict(os.environ, {"OPENAI_API_KEY": "key"}, clear=True):
+        with patch("openai.ChatCompletion.create", side_effect=DummyRateLimitError):
+            with patch("trading_bot.openai_client.RateLimitError", DummyRateLimitError):
+                with pytest.raises(RuntimeError, match="rate limit"):
+                    openai_client.call_openai("hi")
