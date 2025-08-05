@@ -14,7 +14,6 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List
 
 import pandas as pd
-import yfinance as yf
 
 
 @dataclass
@@ -38,6 +37,12 @@ class TechnicalAnalysisAgent:
         The method downloads roughly one month of daily data for ``symbol`` and
         returns the last calculated value for each indicator.
         """
+        try:
+            import yfinance as yf  # type: ignore
+        except ImportError as exc:  # pragma: no cover
+            raise ImportError(
+                "yfinance is required for TechnicalAnalysisAgent. Install it with 'pip install yfinance'."
+            ) from exc
 
         indicators = self.indicators or ["ema_9", "rsi_14", "macd"]
         df = yf.download(symbol, period="1mo", interval="1d", progress=False)

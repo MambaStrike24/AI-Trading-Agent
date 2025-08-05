@@ -9,7 +9,6 @@ shutting the scheduler down when the application exits.
 """
 
 from typing import Callable, Iterable
-from apscheduler.schedulers.background import BackgroundScheduler
 
 
 def schedule_daily_run(
@@ -19,6 +18,13 @@ def schedule_daily_run(
     timezone: str = "US/Eastern",
 ) -> BackgroundScheduler:
     """Schedule ``job_func`` for each symbol once per day."""
+
+    try:
+        from apscheduler.schedulers.background import BackgroundScheduler  # type: ignore
+    except ImportError as exc:  # pragma: no cover
+        raise ImportError(
+            "apscheduler is required to schedule daily runs. Install it with 'pip install apscheduler'."
+        ) from exc
 
     hour, minute = (int(part) for part in run_time.split(":", 1))
     scheduler = BackgroundScheduler(timezone=timezone)

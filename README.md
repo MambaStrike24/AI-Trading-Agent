@@ -63,6 +63,10 @@ For each configured symbol the pipeline performs:
 ## Step‑by‑Step Usage
 
 1. **Install dependencies and run tests**
+
+   This project requires the `yfinance` and `apscheduler` packages for data
+   retrieval and scheduling. They are included in `requirements.txt`.
+
    ```bash
    pip install -r requirements.txt
    pytest -q
