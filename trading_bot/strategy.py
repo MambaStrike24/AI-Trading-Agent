@@ -10,6 +10,7 @@ def compose_strategy(
     symbol: str,
     *,
     technical: Optional[Dict[str, Any]] = None,
+    market: Optional[Dict[str, Any]] = None,
     news: Optional[Dict[str, Any]] = None,
     social: Optional[Dict[str, Any]] = None,
     macro: Optional[Dict[str, Any]] = None,
@@ -21,7 +22,7 @@ def compose_strategy(
     ----------
     symbol:
         Ticker symbol to which the strategy applies.
-    technical, news, social, macro:
+    technical, market, news, social, macro:
         Dictionaries produced by the corresponding agents.
     strategy_date:
         ISO formatted date.  Defaults to today if ``None``.
@@ -29,6 +30,7 @@ def compose_strategy(
 
     strategy_date = strategy_date or date.today().isoformat()
     technical = technical or {"summary": "", "details": {}}
+    market = market or {"summary": "", "details": {}}
     news = news or {"summary": "", "headlines": []}
     social = social or {"summary": "", "score": 0}
     macro = macro or {"summary": ""}
@@ -49,6 +51,7 @@ def compose_strategy(
         "trade_management": trade_management,
         "rationale": {
             "technical": {"summary": technical.get("summary", ""), "details": technical},
+            "market": market,
             "news": news,
             "social": social,
             "macro": macro,
