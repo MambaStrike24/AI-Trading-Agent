@@ -3,13 +3,22 @@
 from __future__ import annotations
 
 import os
+from getpass import getpass
 from typing import Any
 
+from dotenv import load_dotenv
 import openai
 try:  # pragma: no cover - import path differs between OpenAI versions
     from openai.error import OpenAIError, RateLimitError
 except Exception:  # pragma: no cover
     from openai import OpenAIError, RateLimitError
+
+
+def ensure_api_key() -> None:
+    """Load ``OPENAI_API_KEY`` from ``.env`` or prompt the user."""
+    load_dotenv()
+    if not os.getenv("OPENAI_API_KEY"):
+        os.environ["OPENAI_API_KEY"] = getpass("Enter OpenAI API key: ")
 
 
 def call_openai(prompt: str, *, temperature: float = 0.7) -> str:
@@ -34,6 +43,8 @@ def call_openai(prompt: str, *, temperature: float = 0.7) -> str:
     RuntimeError
         If the OpenAI API returns an error.
     """
+    ensure_api_key()
+
     api_key = os.getenv("OPENAI_API_KEY")
     if not api_key:
         raise ValueError("OPENAI_API_KEY environment variable is not set")
@@ -54,4 +65,4 @@ def call_openai(prompt: str, *, temperature: float = 0.7) -> str:
     return response.choices[0].message["content"].strip()
 
 
-__all__ = ["call_openai"]
+__all__ = ["call_openai", "ensure_api_key"]
