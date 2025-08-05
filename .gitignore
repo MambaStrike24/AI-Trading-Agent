@@ -10,6 +10,7 @@ data/
 .venv/
 env/
 env
+.env
 
 # Jupyter & Python cache
 __pycache__/

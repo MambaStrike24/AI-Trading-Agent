@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import sys
 from getpass import getpass
 from typing import Any
 
@@ -13,13 +14,21 @@ try:  # pragma: no cover - import path differs between OpenAI versions
 except Exception:  # pragma: no cover
     from openai import OpenAIError, RateLimitError
 
+from pathlib import Path
 
 def ensure_api_key() -> None:
     """Load ``OPENAI_API_KEY`` from ``.env`` or prompt the user."""
-    load_dotenv()
-    if not os.getenv("OPENAI_API_KEY"):
-        os.environ["OPENAI_API_KEY"] = getpass("Enter OpenAI API key: ")
+    # load_dotenv()
+    
+    # if not os.getenv("OPENAI_API_KEY"):
+    #     os.environ["OPENAI_API_KEY"] = getpass("Enter OpenAI API key: ")
 
+    # Dynamically find the root project directory and load .env
+    project_root = Path(__file__).resolve().parent.parent  # adjust depth as needed
+    dotenv_path = project_root / ".env"
+    load_dotenv(dotenv_path=dotenv_path)
+
+    # print("OPENAI_API_KEY:", os.getenv("OPENAI_API_KEY"))
 
 def call_openai(prompt: str, *, temperature: float = 0.7) -> str:
     """Send ``prompt`` to OpenAI and return the model's reply.
