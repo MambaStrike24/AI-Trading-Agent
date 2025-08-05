@@ -1,38 +1,40 @@
 # AI Trading Agent
 
-This repository implements a minimal **LLM‑powered trading framework**.
-Agents query a language model for insights about a stock symbol and return a
-structured JSON report that can be consumed by downstream tools.
+This repository implements a minimal **role‑based trading framework** powered by OpenAI.
+Specialised agents (market analyst, risk advisor, news summariser, etc.) query
+the OpenAI API for insights about a stock symbol. A small `Coordinator`
+orchestrates their conversation and returns a structured report for downstream
+tools. The agents require an `OPENAI_API_KEY` to be present in the environment.
 
 ## Project Modules
 
 | Module / File | Purpose |
 | --- | --- |
-| `trading_bot/agents/llm_agent.py` | Queries a language model for market commentary. |
+| `trading_bot/agents/llm_roles.py` | Role‑specific OpenAI agents (analyst, risk advisor, news summariser). |
+| `trading_bot/coordinator.py` | Orchestrates conversations between role agents. |
+| `trading_bot/openai_client.py` | Thin wrapper around the OpenAI API. |
 | `trading_bot/strategy.py` | Combines agent outputs into entry, sizing, risk and exit sections. |
 | `trading_bot/backtest.py` | Runs a simple buy‑and‑hold simulation to evaluate a strategy. |
 | `trading_bot/storage.py` | Persists agent outputs and strategies as JSON under a symbol/date tree. |
 | `trading_bot/portfolio.py` | Tracks open and closed positions and computes PnL. |
 | `trading_bot/scheduler.py` | Queues daily runs with APScheduler. |
-| `trading_bot/pipeline.py` | Runs LLM agents and aggregates their outputs. |
+| `trading_bot/pipeline.py` | Delegates execution to the coordinator. |
 
 ## Agent Output
 
-Every agent returns a JSON serialisable dictionary containing:
+Every role agent returns a JSON serialisable dictionary containing:
 
 - `agent`: name of the agent
 - `symbol`: the instrument analysed
-- `summary`: brief conclusion from the model
-- `raw_response`: full text returned by the LLM
+- a role‑specific field such as `analysis`, `assessment` or `summary`
 
-Example response from the `LLMAgent`:
+Example response from the `MarketAnalystAgent`:
 
 ```json
 {
-  "agent": "LLMAgent",
+  "agent": "MarketAnalystAgent",
   "symbol": "TSLA",
-  "summary": "Tesla shows growth potential this quarter.",
-  "raw_response": "Tesla's recent earnings beat expectations..."
+  "analysis": "Tesla shows growth potential this quarter."
 }
 ```
 
@@ -40,7 +42,7 @@ Example response from the `LLMAgent`:
 
 For each configured symbol the pipeline performs:
 
-1. **Run agents** – gather LLM-based commentary.
+1. **Run agents** – gather specialised LLM-based commentary.
 2. Optionally feed the combined reports into separate strategy or backtesting
    utilities.
 
@@ -63,17 +65,35 @@ For each configured symbol the pipeline performs:
    pip install -r requirements.txt
    pytest -q
    ```
-3. **Construct and run the pipeline**
+3. **Construct and run the coordinator**
    ```python
-   from trading_bot.agents import LLMAgent
+   from trading_bot.coordinator import Coordinator
    from trading_bot.pipeline import Pipeline
+   from trading_bot.agents.llm_roles import (
+       MarketAnalystAgent,
+       RiskAdvisorAgent,
+       NewsSummarizerAgent,
+   )
 
-   agents = [LLMAgent()]
-   pipeline = Pipeline(agents=agents)
+   class Analyst:
+       def respond(self, symbol, history):
+           return {"message": MarketAnalystAgent().analyze(symbol)["analysis"]}
+
+   class Risk:
+       def respond(self, symbol, history):
+           return {"message": RiskAdvisorAgent().assess(symbol)["assessment"]}
+
+   class News:
+       def respond(self, symbol, history):
+           return {"message": NewsSummarizerAgent().summarize(symbol)["summary"]}
+
+   coordinator = Coordinator([Analyst(), Risk(), News()])
+   pipeline = Pipeline(coordinator)
 
    result = pipeline.run("TSLA")
-   print(result["reports"])  # list of agent outputs
+   print(result["conversation"])  # exchange between agents
    ```
+   A notebook version is available at `notebooks/role_coordinator_demo.ipynb`.
 4. **Schedule a daily run**
    ```python
    from trading_bot.scheduler import schedule_daily_run
