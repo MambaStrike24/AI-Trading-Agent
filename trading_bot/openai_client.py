@@ -1,4 +1,4 @@
-"""Lightweight wrapper around OpenAI's ChatCompletion API."""
+"""Lightweight wrapper around OpenAI's chat completions API."""
 
 from __future__ import annotations
 
@@ -8,11 +8,7 @@ from getpass import getpass
 from typing import Any
 
 from dotenv import load_dotenv
-import openai
-try:  # pragma: no cover - import path differs between OpenAI versions
-    from openai.error import OpenAIError, RateLimitError
-except Exception:  # pragma: no cover
-    from openai import OpenAIError, RateLimitError
+from openai import OpenAI, OpenAIError, RateLimitError
 
 from pathlib import Path
 
@@ -58,10 +54,10 @@ def call_openai(prompt: str, *, temperature: float = 0.7) -> str:
     if not api_key:
         raise ValueError("OPENAI_API_KEY environment variable is not set")
 
-    openai.api_key = api_key
+    client = OpenAI(api_key=api_key)
 
     try:
-        response: Any = openai.ChatCompletion.create(
+        response: Any = client.chat.completions.create(
             model="gpt-3.5-turbo",
             messages=[{"role": "user", "content": prompt}],
             temperature=temperature,
