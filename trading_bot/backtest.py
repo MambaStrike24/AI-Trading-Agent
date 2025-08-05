@@ -13,7 +13,6 @@ from datetime import datetime
 from typing import Any, Dict, List
 
 import pandas as pd
-import yfinance as yf
 
 
 @dataclass
@@ -29,6 +28,13 @@ class Backtester:
         end_date: str,
         strategy_dict: Dict[str, Any],
     ) -> Dict[str, Any]:
+        try:
+            import yfinance as yf  # type: ignore
+        except ImportError as exc:  # pragma: no cover
+            raise ImportError(
+                "yfinance is required for backtesting. Install it with 'pip install yfinance'."
+            ) from exc
+
         df = yf.download(
             symbol,
             start=start_date,
