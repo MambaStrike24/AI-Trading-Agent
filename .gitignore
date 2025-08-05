@@ -2,3 +2,21 @@ __pycache__/
 *.pyc
 
 data/
+
+# macOS system files
+.DS_Store
+
+# virtual environments
+.venv/
+env/
+env
+
+# Jupyter & Python cache
+__pycache__/
+.ipynb_checkpoints/
+
+# VSCode workspace settings (optional)
+.vscode/
+
+# other unwanted folders
+*.egg-info/
