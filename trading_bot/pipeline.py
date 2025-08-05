@@ -4,8 +4,7 @@ The pipeline accepts a sequence of :class:`~trading_bot.agents.LLMAgent`
 instances. When run for a symbol it executes each agent and aggregates their
 responses into a single dictionary.
 
-This stripped down version intentionally focuses on LLM driven analysis and
-drops the previous rule-based agents.
+This stripped down version intentionally focuses on LLM driven analysis.
 """
 
 from __future__ import annotations

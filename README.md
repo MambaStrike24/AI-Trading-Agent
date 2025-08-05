@@ -1,6 +1,6 @@
 # AI Trading Agent
 
-This repository implements a minimal **agent‑based trading framework**.
+This repository implements a minimal **LLM‑powered trading framework**.
 Agents query a language model for insights about a stock symbol and return a
 structured JSON report that can be consumed by downstream tools.
 
@@ -46,7 +46,15 @@ For each configured symbol the pipeline performs:
 
 ## Step‑by‑Step Usage
 
-1. **Install dependencies and run tests**
+1. **Set your OpenAI API key**
+
+   The LLM agents use the OpenAI API. Export your key before running any code:
+
+   ```bash
+   export OPENAI_API_KEY="sk-..."  # Linux / macOS
+   # For Windows PowerShell use: setx OPENAI_API_KEY "sk-..."
+   ```
+2. **Install dependencies and run tests**
 
    This project requires the `yfinance` and `apscheduler` packages for data
    retrieval and scheduling. They are included in `requirements.txt`.
@@ -55,7 +63,7 @@ For each configured symbol the pipeline performs:
    pip install -r requirements.txt
    pytest -q
    ```
-2. **Construct and run the pipeline**
+3. **Construct and run the pipeline**
    ```python
    from trading_bot.agents import LLMAgent
    from trading_bot.pipeline import Pipeline
@@ -66,7 +74,7 @@ For each configured symbol the pipeline performs:
    result = pipeline.run("TSLA")
    print(result["reports"])  # list of agent outputs
    ```
-3. **Schedule a daily run**
+4. **Schedule a daily run**
    ```python
    from trading_bot.scheduler import schedule_daily_run
 
