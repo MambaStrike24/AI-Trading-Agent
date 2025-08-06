@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 from typing import Any, Dict
+import warnings
 
 
 class _BaseAgent:
@@ -18,7 +19,7 @@ class _BaseAgent:
     name: str
     prompt_template: str
 
-    def _query(self, symbol: str, extra_fields: str) -> Dict[str, Any]:
+    def _query(self, symbol: str, extra_field: str) -> Dict[str, Any]:
         try:  # Import lazily so missing dependencies do not break imports.
             from trading_bot import openai_client
         except Exception as exc:  # pragma: no cover - exercised when dependency missing
@@ -26,12 +27,23 @@ class _BaseAgent:
 
         prompt = self.prompt_template.format(symbol=symbol)
         prompt += (
-            " Respond in JSON with keys: summary, reasoning, " + extra_fields
+            " Respond ONLY in JSON with keys: summary, reasoning, " + extra_field
         )
         raw = openai_client.call_llm(prompt)
-        data = json.loads(raw)
+        try:
+            data = json.loads(raw)
+        except json.JSONDecodeError as exc:
+            warnings.warn(f"Malformed JSON from {self.name}: {exc}")
+            data = {
+                "summary": "",
+                "reasoning": "",
+                extra_field: None,
+                "error": str(exc),
+            }
         data["agent"] = self.name
         data["symbol"] = symbol
+        if extra_field not in data:
+            data[extra_field] = None
         return data
 
 

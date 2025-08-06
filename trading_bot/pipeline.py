@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Dict, Iterable, List, Optional
+import warnings
 
 import pandas as pd
 
@@ -27,6 +28,31 @@ class Pipeline:
     def _date_iter(self, start: str, end: str) -> Iterable[pd.Timestamp]:
         return pd.date_range(start, end, freq="D")
 
+    def _load_prices(
+        self, symbol: str, start: str, end: str, dates: List[pd.Timestamp]
+    ) -> pd.Series:
+        try:  # pragma: no cover - exercised when yfinance available
+            import yfinance as yf  # type: ignore
+
+            df = yf.download(
+                symbol,
+                start=start,
+                end=(pd.to_datetime(end) + pd.Timedelta(days=1)).strftime("%Y-%m-%d"),
+                interval="1d",
+                progress=False,
+            )
+            if df.empty:
+                raise ValueError
+            prices = df["Close"]
+            prices.index = pd.to_datetime(prices.index)
+            return prices
+        except Exception:  # pragma: no cover - fallback path
+            warnings.warn(
+                "yfinance unavailable or returned no data; using synthetic price 100.0",
+                RuntimeWarning,
+            )
+            return pd.Series(100.0, index=dates)
+
     def run(
         self,
         symbol: str,
@@ -45,10 +71,14 @@ class Pipeline:
 
         if today:
             dates = [pd.to_datetime(today)]
+            price_series = self._load_prices(symbol, today, today, dates)
         else:
             if start_date is None or end_date is None:
-                raise ValueError("start_date and end_date must be provided when today is not set")
+                raise ValueError(
+                    "start_date and end_date must be provided when today is not set"
+                )
             dates = list(self._date_iter(start_date, end_date))
+            price_series = self._load_prices(symbol, start_date, end_date, dates)
 
         day_results: List[Dict[str, Any]] = []
 
@@ -61,18 +91,18 @@ class Pipeline:
             strategy = compose_strategy(symbol, agent_map, strategy_date=day_str)
             strat_path = self.storage.save("strategy", symbol, day_str, strategy)
 
+            price = float(price_series.get(ts, price_series.iloc[0]))
             if self.portfolio is not None:
-                entry_price = 100.0
                 pos = self.portfolio.open_position(
                     symbol,
                     size=1,
-                    entry_price=entry_price,
+                    entry_price=price,
                     entry_time=datetime.fromisoformat(day_str + "T00:00:00"),
                     strategy_ref=day_str,
                 )
                 self.portfolio.close_position(
                     pos,
-                    exit_price=entry_price,
+                    exit_price=price,
                     exit_time=datetime.fromisoformat(day_str + "T23:59:59"),
                 )
 
@@ -86,7 +116,14 @@ class Pipeline:
             )
 
         if today:
-            return day_results[-1]["strategy"]
+            last = day_results[-1]
+            return {
+                "strategy": last["strategy"],
+                "files": {
+                    "conversation": last["conversation_path"],
+                    "strategy": last["strategy_path"],
+                },
+            }
 
         files = {
             "conversations": [d["conversation_path"] for d in day_results],

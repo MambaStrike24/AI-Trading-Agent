@@ -13,8 +13,10 @@ model into the rest of the system.
 from __future__ import annotations
 
 from typing import Any, Callable
+import warnings
 
 _GENERATOR: Callable[[str], str] | None = None
+_USING_ECHO = False
 
 
 def _load_generator() -> Callable[[str], str]:
@@ -47,11 +49,16 @@ def _load_generator() -> Callable[[str], str]:
             return result[0]["generated_text"]
 
         _GENERATOR = _gen
-    except Exception:  # pragma: no cover - fallback when transformers missing
+    except Exception as exc:  # pragma: no cover - fallback when transformers missing
+        warnings.warn(
+            "transformers not available, falling back to echo mode", RuntimeWarning
+        )
 
         def _gen(prompt: str, **_: Any) -> str:
             return f"{prompt}"
 
+        global _USING_ECHO
+        _USING_ECHO = True
         _GENERATOR = _gen
 
     return _GENERATOR
@@ -75,6 +82,8 @@ def call_llm(prompt: str, *, temperature: float = 0.7) -> str:
     """
 
     generator = _load_generator()
+    if _USING_ECHO:  # pragma: no cover - simple warning for echo mode
+        warnings.warn("LLM dependencies missing, echoing prompt", RuntimeWarning)
     return generator(prompt, temperature=temperature)
 
 
