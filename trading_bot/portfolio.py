@@ -62,5 +62,9 @@ class Portfolio:
     def closed_positions(self) -> List[Position]:
         return [p for p in self.positions if not p.is_open()]
 
+    def total_pnl(self) -> float:
+        """Return the realised profit and loss of all closed positions."""
+        return sum(p.pnl() or 0.0 for p in self.closed_positions())
+
 
 __all__ = ["Portfolio", "Position"]

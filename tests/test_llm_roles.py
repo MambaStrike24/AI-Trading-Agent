@@ -48,3 +48,12 @@ def test_news_summarizer_agent_returns_structured_data():
     assert data["headlines"] == ["h1"]
     assert data["agent"] == "NewsSummarizerAgent"
 
+
+def test_agent_handles_malformed_json():
+    fake = MagicMock(return_value="not json")
+    with patch("trading_bot.openai_client.call_llm", fake):
+        agent = MarketAnalystAgent()
+        data = agent.analyze("MSFT")
+    assert data["summary"] == ""
+    assert "error" in data
+

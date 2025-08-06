@@ -24,6 +24,7 @@ def test_portfolio_tracks_positions():
     pf.close_position(pos, 110.0, datetime(2024, 1, 2, 10, 0))
     assert pf.closed_positions() == [pos]
     assert pos.pnl() == 100.0
+    assert pf.total_pnl() == 100.0
 
 
 def test_scheduler_creates_jobs():
