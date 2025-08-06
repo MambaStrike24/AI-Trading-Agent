@@ -1,49 +1,50 @@
+import json
 from unittest.mock import MagicMock, patch
 
 from trading_bot.agents import (
     MarketAnalystAgent,
-    NewsSummarizerAgent,
     RiskAdvisorAgent,
+    NewsSummarizerAgent,
 )
 
 
-def test_market_analyst_agent_uses_prompt_template():
-    response_text = "Analysis result"
-    fake_call = MagicMock(return_value=response_text)
-    with patch("trading_bot.openai_client.call_openai", fake_call):
-        template = "Analyze the market for {symbol}"
-        agent = MarketAnalystAgent(prompt_template=template)
-        result = agent.analyze("AAPL")
-        fake_call.assert_called_once_with("Analyze the market for AAPL")
+def test_market_analyst_agent_returns_structured_data():
+    response = json.dumps(
+        {"summary": "s", "reasoning": "r", "market_trend": "up"}
+    )
+    fake = MagicMock(return_value=response)
+    with patch("trading_bot.openai_client.call_llm", fake):
+        agent = MarketAnalystAgent()
+        data = agent.analyze("AAPL")
 
-    assert result["agent"] == "MarketAnalystAgent"
-    assert result["symbol"] == "AAPL"
-    assert result["analysis"] == response_text
-
-
-def test_risk_advisor_agent_uses_prompt_template():
-    response_text = "Risk assessment"
-    fake_call = MagicMock(return_value=response_text)
-    with patch("trading_bot.openai_client.call_openai", fake_call):
-        template = "Assess risks for {symbol}"
-        agent = RiskAdvisorAgent(prompt_template=template)
-        result = agent.assess("TSLA")
-        fake_call.assert_called_once_with("Assess risks for TSLA")
-
-    assert result["agent"] == "RiskAdvisorAgent"
-    assert result["symbol"] == "TSLA"
-    assert result["assessment"] == response_text
+    fake.assert_called_once()
+    assert data["summary"] == "s"
+    assert data["reasoning"] == "r"
+    assert data["market_trend"] == "up"
 
 
-def test_news_summarizer_agent_uses_prompt_template():
-    response_text = "News summary"
-    fake_call = MagicMock(return_value=response_text)
-    with patch("trading_bot.openai_client.call_openai", fake_call):
-        template = "Summarize news for {symbol}"
-        agent = NewsSummarizerAgent(prompt_template=template)
-        result = agent.summarize("GOOG")
-        fake_call.assert_called_once_with("Summarize news for GOOG")
+def test_risk_advisor_agent_returns_structured_data():
+    response = json.dumps(
+        {"summary": "s", "reasoning": "r", "risk_level": "low"}
+    )
+    fake = MagicMock(return_value=response)
+    with patch("trading_bot.openai_client.call_llm", fake):
+        agent = RiskAdvisorAgent()
+        data = agent.assess("TSLA")
 
-    assert result["agent"] == "NewsSummarizerAgent"
-    assert result["symbol"] == "GOOG"
-    assert result["summary"] == response_text
+    assert data["risk_level"] == "low"
+    assert data["agent"] == "RiskAdvisorAgent"
+
+
+def test_news_summarizer_agent_returns_structured_data():
+    response = json.dumps(
+        {"summary": "s", "reasoning": "r", "headlines": ["h1"]}
+    )
+    fake = MagicMock(return_value=response)
+    with patch("trading_bot.openai_client.call_llm", fake):
+        agent = NewsSummarizerAgent()
+        data = agent.summarize("GOOG")
+
+    assert data["headlines"] == ["h1"]
+    assert data["agent"] == "NewsSummarizerAgent"
+

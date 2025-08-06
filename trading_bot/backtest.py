@@ -27,6 +27,7 @@ class Backtester:
         start_date: str,
         end_date: str,
         strategy_dict: Dict[str, Any],
+        portfolio: Any | None = None,
     ) -> Dict[str, Any]:
         try:
             import yfinance as yf  # type: ignore
@@ -62,7 +63,7 @@ class Backtester:
             }
         ]
 
-        return {
+        result = {
             "symbol": symbol,
             "date_range": [start_date, end_date],
             "net_return": net_return,
@@ -73,6 +74,24 @@ class Backtester:
             "agent_inputs": {},
             "data_source": self.data_source,
         }
+
+        if portfolio is not None:  # pragma: no cover - simple integration hook
+            from datetime import datetime
+
+            entry = portfolio.open_position(
+                symbol,
+                size=1,
+                entry_price=float(prices.iloc[0]),
+                entry_time=datetime.fromisoformat(start_date + "T00:00:00"),
+                strategy_ref="backtest",
+            )
+            portfolio.close_position(
+                entry,
+                exit_price=float(prices.iloc[-1]),
+                exit_time=datetime.fromisoformat(end_date + "T00:00:00"),
+            )
+
+        return result
 
 
 __all__: List[str] = ["Backtester"]
