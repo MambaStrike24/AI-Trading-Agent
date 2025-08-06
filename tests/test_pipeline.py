@@ -1,43 +1,40 @@
+from pathlib import Path
+from unittest.mock import MagicMock
+
 from trading_bot.coordinator import Coordinator
 from trading_bot.pipeline import Pipeline
+from trading_bot.storage import JSONStorage
+from trading_bot.backtest import Backtester
+from trading_bot.portfolio import Portfolio
 
 
 class DummyAgent:
-    def __init__(self, name, message, question=None):
+    def __init__(self, name: str):
         self.name = name
-        self.message = message
-        self.question = question
-        self.received_history = None
 
     def respond(self, symbol, history):
-        # store history to assert later
-        self.received_history = list(history)
-        response = {"message": f"{self.message} {symbol}"}
-        if self.question:
-            response["question"] = self.question
-        return response
+        return {"summary": f"{self.name} for {symbol}"}
 
 
-def test_agents_exchange_messages_and_final_decision_composed():
-    analyst = DummyAgent("Analyst", "analysis for", question="need more data?")
-    trader = DummyAgent("Trader", "decision for")
+def test_coordinator_builds_strategy_summary():
+    c = Coordinator([DummyAgent("A"), DummyAgent("B")])
+    result = c.run("TSLA")
+    assert result["strategy_summary"] == "A for TSLA B for TSLA"
+    assert len(result["conversation"]) == 2
 
-    coordinator = Coordinator([analyst, trader])
-    pipeline = Pipeline(coordinator)
-    result = pipeline.run("TSLA")
 
-    # first agent receives empty history
-    assert analyst.received_history == []
-    # second agent sees first agent's message
-    assert trader.received_history == [
-        {"agent": "Analyst", "message": "analysis for TSLA"}
-    ]
+def test_pipeline_runs_range_and_backtests(tmp_path):
+    coord = Coordinator([DummyAgent("A")])
+    storage = JSONStorage(base_dir=tmp_path)
+    backtester = Backtester()
+    portfolio = Portfolio()
+    pipeline = Pipeline(coord, storage=storage, backtester=backtester, portfolio=portfolio)
 
-    assert result["conversation"] == [
-        {"agent": "Analyst", "message": "analysis for TSLA"},
-        {"agent": "Trader", "message": "decision for TSLA"},
-    ]
-    assert result["follow_ups"] == [
-        {"agent": "Analyst", "question": "need more data?"}
-    ]
-    assert result["final_decision"] == "decision for TSLA"
+    backtester.backtest = MagicMock(return_value={"net_return": 1})
+
+    result = pipeline.run("TSLA", start_date="2024-01-01", end_date="2024-01-02")
+
+    assert len(result["days"]) == 2
+    assert Path(result["days"][0]["strategy_path"]).exists()
+    backtester.backtest.assert_called_once()
+

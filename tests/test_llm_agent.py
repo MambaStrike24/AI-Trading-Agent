@@ -6,7 +6,7 @@ from trading_bot.agents import LLMAgent
 def test_llmagent_calls_openai_and_structures_output():
     response_text = "Bullish outlook on TSLA\nFurther details here"
     fake_call = MagicMock(return_value=response_text)
-    with patch("trading_bot.openai_client.call_openai", fake_call):
+    with patch("trading_bot.openai_client.call_llm", fake_call):
         agent = LLMAgent()
         result = agent.analyze("TSLA")
         fake_call.assert_called_once()

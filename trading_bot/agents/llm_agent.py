@@ -1,10 +1,11 @@
 from __future__ import annotations
 
-"""Lightweight agent that queries an LLM for market commentary.
+"""Lightweight agent that queries a local LLM for market commentary.
 
-The agent relies on :mod:`trading_bot.openai_client` to interact with OpenAI's
-API.  The text response from the model is wrapped into a small structured
-dictionary so it fits the common interface used across the project.
+The agent relies on :mod:`trading_bot.openai_client` which in turn utilises a
+small open-source model.  The text response from the model is wrapped into a
+small structured dictionary so it fits the common interface used across the
+project.
 """
 
 from typing import Dict
@@ -17,7 +18,7 @@ class LLMAgent:
         """Return an LLM-generated summary for ``symbol``.
 
         The method crafts a prompt referencing ``symbol`` and delegates the
-        request to :func:`trading_bot.openai_client.call_openai`.  The raw text
+        request to :func:`trading_bot.openai_client.call_llm`.  The raw text
         reply from the model is packaged into a simple dictionary alongside a
         one-line summary extracted from the response.
         """
@@ -30,7 +31,7 @@ class LLMAgent:
             ) from exc
 
         prompt = f"Provide a concise investment summary for the stock symbol {symbol}."
-        raw_response = openai_client.call_openai(prompt)
+        raw_response = openai_client.call_llm(prompt)
         summary = raw_response.strip().splitlines()[0] if raw_response else ""
 
         return {

@@ -1,69 +1,82 @@
-"""Lightweight wrapper around OpenAI's ChatCompletion API."""
+"""Minimal wrapper around a local open-source language model.
+
+The real project originally relied on the OpenAI API.  For the unit tests and
+examples in this kata we instead use an entirely free approach based on the
+`transformers` library.  The :func:`call_llm` function attempts to load a very
+small model that ships with ``transformers`` and generates text locally.  If
+``transformers`` (or its heavy dependencies such as ``torch``) are not
+available, the function falls back to simply echoing the provided prompt.  This
+keeps the project self-contained while still demonstrating how one might wire a
+model into the rest of the system.
+"""
 
 from __future__ import annotations
 
-import os
-from pathlib import Path
+from typing import Any, Callable
 
-from dotenv import load_dotenv
-from openai import OpenAI, OpenAIError, RateLimitError
+_GENERATOR: Callable[[str], str] | None = None
 
-def ensure_api_key() -> None:
-    """Load ``OPENAI_API_KEY`` from ``.env`` or prompt the user."""
-    # load_dotenv()
-    
-    # if not os.getenv("OPENAI_API_KEY"):
-    #     os.environ["OPENAI_API_KEY"] = getpass("Enter OpenAI API key: ")
 
-    # Dynamically find the root project directory and load .env
-    project_root = Path(__file__).resolve().parent.parent  # adjust depth as needed
-    dotenv_path = project_root / ".env"
-    load_dotenv(dotenv_path=dotenv_path)
+def _load_generator() -> Callable[[str], str]:
+    """Load a tiny text generation pipeline.
 
-    # print("OPENAI_API_KEY:", os.getenv("OPENAI_API_KEY"))
+    The function is separated out so tests can easily monkeypatch the loading
+    mechanism.  ``transformers`` is imported lazily to avoid hard dependencies
+    during module import.  If the library (or its required backend like
+    ``torch``) is unavailable, a trivial echo generator is returned instead.
+    """
 
-def call_openai(prompt: str, *, temperature: float = 0.7) -> str:
-    """Send ``prompt`` to OpenAI and return the model's reply.
+    global _GENERATOR
+    if _GENERATOR is not None:
+        return _GENERATOR
+
+    try:  # pragma: no cover - exercised in the import success path
+        from transformers import pipeline  # type: ignore
+
+        pipe = pipeline(
+            "text-generation", model="hf-internal-testing/tiny-random-gpt2"
+        )
+
+        def _gen(prompt: str, *, temperature: float = 0.7, max_new_tokens: int = 32) -> str:
+            result = pipe(
+                prompt,
+                do_sample=True,
+                temperature=temperature,
+                max_new_tokens=max_new_tokens,
+            )
+            return result[0]["generated_text"]
+
+        _GENERATOR = _gen
+    except Exception:  # pragma: no cover - fallback when transformers missing
+
+        def _gen(prompt: str, **_: Any) -> str:
+            return f"{prompt}"
+
+        _GENERATOR = _gen
+
+    return _GENERATOR
+
+
+def call_llm(prompt: str, *, temperature: float = 0.7) -> str:
+    """Generate text using a local model.
 
     Parameters
     ----------
     prompt:
-        Text prompt to send to the model.
+        The prompt to feed into the model.
     temperature:
-        Sampling temperature to use for the completion.
+        Sampling temperature used when generating text.
 
     Returns
     -------
     str
-        The text of the model's response.
-
-    Raises
-    ------
-    ValueError
-        If ``OPENAI_API_KEY`` is not set in the environment.
-    RuntimeError
-        If the OpenAI API returns an error.
+        The generated text.  If the model cannot be loaded, the prompt itself is
+        echoed back.
     """
-    ensure_api_key()
 
-    api_key = os.getenv("OPENAI_API_KEY")
-    if not api_key:
-        raise ValueError("OPENAI_API_KEY environment variable is not set")
-
-    client = OpenAI(api_key=api_key)
-
-    try:
-        response = client.chat.completions.create(
-            model="gpt-3.5-turbo",
-            messages=[{"role": "user", "content": prompt}],
-            temperature=temperature,
-        )
-    except RateLimitError as exc:
-        raise RuntimeError("OpenAI API rate limit exceeded") from exc
-    except OpenAIError as exc:
-        raise RuntimeError(f"OpenAI API error: {exc}") from exc
-
-    return response.choices[0].message.content.strip()
+    generator = _load_generator()
+    return generator(prompt, temperature=temperature)
 
 
-__all__ = ["call_openai", "ensure_api_key"]
+__all__ = ["call_llm"]
+

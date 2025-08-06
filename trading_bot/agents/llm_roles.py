@@ -1,87 +1,97 @@
+"""Specialised agents powered by a lightweight local language model.
+
+Each agent issues a structured prompt instructing the model to return JSON with
+the fields ``summary`` and ``reasoning`` plus a role specific field.  The JSON is
+parsed and surfaced to the caller as a normal dictionary which makes downstream
+processing straightforward.
+"""
+
 from __future__ import annotations
 
-"""Specialized LLM-backed agents for different market research roles."""
+import json
+from typing import Any, Dict
 
-from typing import Dict
+
+class _BaseAgent:
+    """Common helper to query the LLM and parse JSON responses."""
+
+    name: str
+    prompt_template: str
+
+    def _query(self, symbol: str, extra_fields: str) -> Dict[str, Any]:
+        try:  # Import lazily so missing dependencies do not break imports.
+            from trading_bot import openai_client
+        except Exception as exc:  # pragma: no cover - exercised when dependency missing
+            raise ImportError("openai_client must be available to use agents") from exc
+
+        prompt = self.prompt_template.format(symbol=symbol)
+        prompt += (
+            " Respond in JSON with keys: summary, reasoning, " + extra_fields
+        )
+        raw = openai_client.call_llm(prompt)
+        data = json.loads(raw)
+        data["agent"] = self.name
+        data["symbol"] = symbol
+        return data
 
 
-class MarketAnalystAgent:
+class MarketAnalystAgent(_BaseAgent):
     """Generate market analysis for a ticker symbol."""
 
-    def __init__(self, prompt_template: str = "Provide a market analysis for {symbol}.") -> None:
-        self.prompt_template = prompt_template
+    name = "MarketAnalystAgent"
 
-    def analyze(self, symbol: str) -> Dict[str, str]:
-        """Return a market analysis for ``symbol`` using an LLM."""
-        try:  # Import lazily so missing dependencies don't break module import.
-            from trading_bot import openai_client
-        except Exception as exc:  # pragma: no cover - exercised when dependency missing
-            raise ImportError(
-                "openai_client (and openai) must be available to use MarketAnalystAgent"
-            ) from exc
+    def __init__(self, prompt_template: str | None = None) -> None:
+        self.prompt_template = (
+            prompt_template or "Provide a market analysis for {symbol}."
+        )
 
-        prompt = self.prompt_template.format(symbol=symbol)
-        raw_response = openai_client.call_openai(prompt)
+    def analyze(self, symbol: str) -> Dict[str, Any]:
+        """Return a structured market analysis."""
 
-        return {
-            "agent": "MarketAnalystAgent",
-            "symbol": symbol,
-            "analysis": raw_response,
-        }
+        return self._query(symbol, "market_trend")
+
+    def respond(self, symbol: str, history: Any | None = None) -> Dict[str, Any]:
+        return self.analyze(symbol)
 
 
-class RiskAdvisorAgent:
+class RiskAdvisorAgent(_BaseAgent):
     """Assess investment risks for a ticker symbol."""
 
-    def __init__(
-        self, prompt_template: str = "Offer an investment risk assessment for {symbol}."
-    ) -> None:
-        self.prompt_template = prompt_template
+    name = "RiskAdvisorAgent"
 
-    def assess(self, symbol: str) -> Dict[str, str]:
-        """Return a risk assessment for ``symbol`` using an LLM."""
-        try:  # Import lazily so missing dependencies don't break module import.
-            from trading_bot import openai_client
-        except Exception as exc:  # pragma: no cover - exercised when dependency missing
-            raise ImportError(
-                "openai_client (and openai) must be available to use RiskAdvisorAgent"
-            ) from exc
+    def __init__(self, prompt_template: str | None = None) -> None:
+        self.prompt_template = (
+            prompt_template or "Offer an investment risk assessment for {symbol}."
+        )
 
-        prompt = self.prompt_template.format(symbol=symbol)
-        raw_response = openai_client.call_openai(prompt)
+    def assess(self, symbol: str) -> Dict[str, Any]:
+        """Return a structured risk assessment."""
 
-        return {
-            "agent": "RiskAdvisorAgent",
-            "symbol": symbol,
-            "assessment": raw_response,
-        }
+        return self._query(symbol, "risk_level")
+
+    def respond(self, symbol: str, history: Any | None = None) -> Dict[str, Any]:
+        return self.assess(symbol)
 
 
-class NewsSummarizerAgent:
-    """Summarize recent news for a ticker symbol."""
+class NewsSummarizerAgent(_BaseAgent):
+    """Summarise recent news for a ticker symbol."""
 
-    def __init__(
-        self, prompt_template: str = "Summarize the latest financial news affecting {symbol}."
-    ) -> None:
-        self.prompt_template = prompt_template
+    name = "NewsSummarizerAgent"
 
-    def summarize(self, symbol: str) -> Dict[str, str]:
-        """Return a news summary for ``symbol`` using an LLM."""
-        try:  # Import lazily so missing dependencies don't break module import.
-            from trading_bot import openai_client
-        except Exception as exc:  # pragma: no cover - exercised when dependency missing
-            raise ImportError(
-                "openai_client (and openai) must be available to use NewsSummarizerAgent"
-            ) from exc
+    def __init__(self, prompt_template: str | None = None) -> None:
+        self.prompt_template = (
+            prompt_template
+            or "Summarise the latest financial news affecting {symbol}."
+        )
 
-        prompt = self.prompt_template.format(symbol=symbol)
-        raw_response = openai_client.call_openai(prompt)
+    def summarize(self, symbol: str) -> Dict[str, Any]:
+        """Return a structured news summary."""
 
-        return {
-            "agent": "NewsSummarizerAgent",
-            "symbol": symbol,
-            "summary": raw_response,
-        }
+        return self._query(symbol, "headlines")
+
+    def respond(self, symbol: str, history: Any | None = None) -> Dict[str, Any]:
+        return self.summarize(symbol)
 
 
 __all__ = ["MarketAnalystAgent", "RiskAdvisorAgent", "NewsSummarizerAgent"]
+

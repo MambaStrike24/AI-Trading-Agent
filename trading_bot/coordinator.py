@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-"""Simple conversation coordinator for multiple role agents.
+"""Simple coordinator for aggregating structured agent responses.
 
-The :class:`Coordinator` orchestrates a sequential conversation between a list
-of agents.  Each agent receives the conversation history so far and may return
-both a message and an optional follow-up question.  The coordinator aggregates
-these exchanges and exposes the full conversation along with any questions and
-the final decision.
+The previous version of the project implemented a conversation style interface
+where each agent returned a free-form message.  For the new iteration agents
+return structured JSON objects containing a ``summary`` and ``reasoning``.  The
+coordinator simply gathers these results and builds a high level
+``strategy_summary`` by concatenating the individual summaries.
 """
 
 from dataclasses import dataclass
@@ -20,38 +20,18 @@ class Coordinator:
     agents: Sequence[Any]
 
     def run(self, symbol: str) -> Dict[str, Any]:
-        """Run a conversation between all agents.
+        """Execute each agent and collate their structured outputs."""
 
-        Parameters
-        ----------
-        symbol:
-            The market symbol the agents should discuss.
-        Returns
-        -------
-        dict
-            Dictionary containing the conversation history, any follow-up
-            questions raised by agents and the final decision produced by the
-            last agent.
-        """
-        history: List[Dict[str, str]] = []
-        follow_ups: List[Dict[str, str]] = []
+        history: List[Dict[str, Any]] = []
 
         for agent in self.agents:
-            response: Dict[str, str] = agent.respond(symbol, history)
+            response: Dict[str, Any] = agent.respond(symbol, history)
             agent_name = getattr(agent, "name", agent.__class__.__name__)
-            message = response.get("message", "")
-            history.append({"agent": agent_name, "message": message})
-            question = response.get("question")
-            if question:
-                follow_ups.append({"agent": agent_name, "question": question})
+            entry = {"agent": agent_name, **response}
+            history.append(entry)
 
-        final_decision = history[-1]["message"] if history else ""
-        return {
-            "symbol": symbol,
-            "conversation": history,
-            "follow_ups": follow_ups,
-            "final_decision": final_decision,
-        }
+        summary = " ".join(item.get("summary", "") for item in history).strip()
+        return {"symbol": symbol, "conversation": history, "strategy_summary": summary}
 
 
 __all__ = ["Coordinator"]
