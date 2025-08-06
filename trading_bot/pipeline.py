@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Dict, Iterable, List, Optional
 import warnings
@@ -16,14 +15,20 @@ from .backtest import Backtester
 from .portfolio import Portfolio
 
 
-@dataclass
 class Pipeline:
     """Coordinate agents and optionally backtest their combined strategy."""
 
-    coordinator: Coordinator
-    storage: JSONStorage
-    backtester: Optional[Backtester] = None
-    portfolio: Optional[Portfolio] = None
+    def __init__(
+        self,
+        coordinator: Coordinator,
+        storage: JSONStorage,
+        backtester: Optional[Backtester] = None,
+        portfolio: Optional[Portfolio] = None,
+    ) -> None:
+        self.coordinator = coordinator
+        self.storage = storage
+        self.backtester = backtester
+        self.portfolio = portfolio
 
     def _date_iter(self, start: str, end: str) -> Iterable[pd.Timestamp]:
         return pd.date_range(start, end, freq="D")

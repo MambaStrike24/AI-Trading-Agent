@@ -87,8 +87,10 @@ For each configured symbol the pipeline performs:
        def respond(self, symbol, history):
            return {"message": NewsSummarizerAgent().summarize(symbol)["summary"]}
 
+   from trading_bot.storage import JSONStorage
+
    coordinator = Coordinator([Analyst(), Risk(), News()])
-   pipeline = Pipeline(coordinator)
+   pipeline = Pipeline(coordinator, storage=JSONStorage())
 
    result = pipeline.run("TSLA")
    print(result["conversation"])  # exchange between agents
