@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import json
 from typing import Any, Dict
-import warnings
 
 
 class _BaseAgent:
@@ -32,13 +31,16 @@ class _BaseAgent:
         raw = openai_client.call_llm(prompt)
         try:
             data = json.loads(raw)
-        except json.JSONDecodeError as exc:
-            warnings.warn(f"Malformed JSON from {self.name}: {exc}")
+        except json.JSONDecodeError:
+            # When the LLM fails to produce valid JSON (e.g. echo mode) we
+            # return a minimal stub without raising noisy warnings.  Downstream
+            # components can still operate on the structured shape even if the
+            # content is empty.
             data = {
                 "summary": "",
                 "reasoning": "",
                 extra_field: None,
-                "error": str(exc),
+                "error": "invalid json",
             }
         data["agent"] = self.name
         data["symbol"] = symbol

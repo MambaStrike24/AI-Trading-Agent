@@ -49,7 +49,7 @@ def _load_generator() -> Callable[[str], str]:
             return result[0]["generated_text"]
 
         _GENERATOR = _gen
-    except Exception as exc:  # pragma: no cover - fallback when transformers missing
+    except Exception:  # pragma: no cover - fallback when transformers missing
         warnings.warn(
             "transformers not available, falling back to echo mode", RuntimeWarning
         )

@@ -45,6 +45,7 @@ class Pipeline:
                 end=(pd.to_datetime(end) + pd.Timedelta(days=1)).strftime("%Y-%m-%d"),
                 interval="1d",
                 progress=False,
+                auto_adjust=True,
             )
             if df.empty:
                 raise ValueError
@@ -96,7 +97,10 @@ class Pipeline:
             strategy = compose_strategy(symbol, agent_map, strategy_date=day_str)
             strat_path = self.storage.save("strategy", symbol, day_str, strategy)
 
-            price = float(price_series.get(ts, price_series.iloc[0]))
+            if ts in price_series.index:
+                price = float(price_series.loc[ts])
+            else:
+                price = float(price_series.iloc[0])
             if self.portfolio is not None:
                 pos = self.portfolio.open_position(
                     symbol,
