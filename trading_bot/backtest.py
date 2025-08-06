@@ -42,11 +42,15 @@ class Backtester:
             end=end_date,
             interval="1d",
             progress=False,
+            auto_adjust=True,
         )
         if df.empty:
             raise ValueError("No data for backtest")
 
         prices = df["Close"]
+        if isinstance(prices, pd.DataFrame):
+            prices = prices.iloc[:, 0]
+
         net_return = float(prices.iloc[-1] / prices.iloc[0] - 1)
 
         roll_max = prices.cummax()
@@ -69,7 +73,7 @@ class Backtester:
             "net_return": net_return,
             "max_drawdown": max_drawdown,
             "trade_log": trade_log,
-            "equity_curve": [float(p) for p in prices],
+            "equity_curve": prices.astype(float).tolist(),
             "strategy_applied": strategy_dict,
             "agent_inputs": {},
             "data_source": self.data_source,
