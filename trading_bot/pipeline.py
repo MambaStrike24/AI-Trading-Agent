@@ -13,6 +13,8 @@ from .strategy import compose_strategy
 from .storage import JSONStorage
 from .backtest import Backtester
 from .portfolio import Portfolio
+from trading_bot.agents.llm_roles import _stringify_dates
+from trading_bot.agents.llm_roles import _safe_json  # if not already imported
 
 
 class Pipeline:
@@ -43,7 +45,7 @@ class Pipeline:
                 symbol,
                 start=start,
                 end=(pd.to_datetime(end) + pd.Timedelta(days=1)).strftime("%Y-%m-%d"),
-                interval="1d",
+                interval="1h",
                 progress=False,
                 auto_adjust=True,
             )
@@ -90,12 +92,18 @@ class Pipeline:
 
         for ts in dates:
             day_str = ts.strftime("%Y-%m-%d")
-            convo = self.coordinator.run(symbol)
-            convo_path = self.storage.save("conversation", symbol, day_str, convo)
+            convo = self.coordinator.run(symbol, ts.date())
+            convo_serializable = _stringify_dates(convo)
+            convo_path = self.storage.save("conversation", symbol, day_str, _safe_json(convo_serializable))
 
             agent_map = {item["agent"]: item for item in convo["conversation"]}
-            strategy = compose_strategy(symbol, agent_map, strategy_date=day_str)
-            strat_path = self.storage.save("strategy", symbol, day_str, strategy)
+
+            # Use StrategyExecutorAgent's result instead of compose_strategy
+            strategy = agent_map.get("StrategyPlannerAgent")
+            if strategy is None:
+                raise ValueError("StrategyPlannerAgent did not return a strategy.")
+            strategy_serializable = _stringify_dates(strategy)
+            strat_path = self.storage.save("strategy", symbol, day_str, _safe_json(strategy_serializable))
 
             if ts in price_series.index:
                 price = float(price_series.loc[ts])
@@ -120,7 +128,7 @@ class Pipeline:
                     "date": day_str,
                     "conversation_path": str(convo_path),
                     "strategy_path": str(strat_path),
-                    "strategy": strategy,
+                    "strategy": strategy_serializable,
                 }
             )
 

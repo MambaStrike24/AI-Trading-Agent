@@ -1,91 +1,71 @@
-"""Minimal wrapper around a local open-source language model.
+"""Unified wrapper around a language model.
 
-The real project originally relied on the OpenAI API.  For the unit tests and
-examples in this kata we instead use an entirely free approach based on the
-`transformers` library.  The :func:`call_llm` function attempts to load a very
-small model that ships with ``transformers`` and generates text locally.  If
-``transformers`` (or its heavy dependencies such as ``torch``) are not
-available, the function falls back to simply echoing the provided prompt.  This
-keeps the project self-contained while still demonstrating how one might wire a
-model into the rest of the system.
+This wrapper supports both:
+1. A local fallback model (based on Hugging Face transformers, e.g., for testing)
+2. The OpenAI API (used in production for real completions)
+
+To keep the project self-contained for examples and tests, a tiny model is loaded
+locally unless the environment is configured with an OpenAI API key.
+
+The core interface is `call_llm(prompt: str) -> str`
 """
 
 from __future__ import annotations
 
 from typing import Any, Callable
 import warnings
+import os
 
-_GENERATOR: Callable[[str], str] | None = None
-_USING_ECHO = False
+USE_OPENAI = bool(os.getenv("OPENAI_API_KEY"))
+
+if USE_OPENAI:
+    import openai
+    client = openai.OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+else:
+    _GENERATOR: Callable[[str], str] | None = None
+    _USING_ECHO = False
 
 
-def _load_generator() -> Callable[[str], str]:
-    """Load a tiny text generation pipeline.
+    def _load_generator() -> Callable[[str], str]:
+        try:
+            from transformers import pipeline  # type: ignore
+            pipe = pipeline("text-generation", model="hf-internal-testing/tiny-random-gpt2")
 
-    The function is separated out so tests can easily monkeypatch the loading
-    mechanism.  ``transformers`` is imported lazily to avoid hard dependencies
-    during module import.  If the library (or its required backend like
-    ``torch``) is unavailable, a trivial echo generator is returned instead.
-    """
+            def _gen(prompt: str, *, temperature: float = 0.7, max_new_tokens: int = 32) -> str:
+                result = pipe(
+                    prompt,
+                    do_sample=True,
+                    temperature=temperature,
+                    max_new_tokens=max_new_tokens,
+                )
+                return result[0]["generated_text"]
 
-    global _GENERATOR
-    if _GENERATOR is not None:
-        return _GENERATOR
+            return _gen
+        except Exception:
+            warnings.warn("transformers not available, falling back to echo mode", RuntimeWarning)
 
-    try:  # pragma: no cover - exercised in the import success path
-        from transformers import pipeline  # type: ignore
+            def _gen(prompt: str, **_: Any) -> str:
+                return prompt
 
-        pipe = pipeline(
-            "text-generation", model="hf-internal-testing/tiny-random-gpt2"
-        )
+            return _gen
 
-        def _gen(prompt: str, *, temperature: float = 0.7, max_new_tokens: int = 32) -> str:
-            result = pipe(
-                prompt,
-                do_sample=True,
-                temperature=temperature,
-                max_new_tokens=max_new_tokens,
-            )
-            return result[0]["generated_text"]
-
-        _GENERATOR = _gen
-    except Exception:  # pragma: no cover - fallback when transformers missing
-        warnings.warn(
-            "transformers not available, falling back to echo mode", RuntimeWarning
-        )
-
-        def _gen(prompt: str, **_: Any) -> str:
-            return f"{prompt}"
-
-        global _USING_ECHO
-        _USING_ECHO = True
-        _GENERATOR = _gen
-
-    return _GENERATOR
+    _GENERATOR = _load_generator()
 
 
 def call_llm(prompt: str, *, temperature: float = 0.7) -> str:
-    """Generate text using a local model.
-
-    Parameters
-    ----------
-    prompt:
-        The prompt to feed into the model.
-    temperature:
-        Sampling temperature used when generating text.
-
-    Returns
-    -------
-    str
-        The generated text.  If the model cannot be loaded, the prompt itself is
-        echoed back.
-    """
-
-    generator = _load_generator()
-    if _USING_ECHO:  # pragma: no cover - simple warning for echo mode
-        warnings.warn("LLM dependencies missing, echoing prompt", RuntimeWarning)
-    return generator(prompt, temperature=temperature)
-
+    """Generate text using either OpenAI or a local fallback model."""
+    if USE_OPENAI:
+        response = client.chat.completions.create(
+            model="gpt-4",  # or "gpt-3.5-turbo"
+            messages=[
+                {"role": "system", "content": "You are a helpful financial analysis assistant."},
+                {"role": "user", "content": prompt},
+            ],
+            temperature=temperature,
+            max_tokens=500,
+        )
+        return response.choices[0].message.content.strip()
+    else:
+        return _GENERATOR(prompt, temperature=temperature)
 
 __all__ = ["call_llm"]
-

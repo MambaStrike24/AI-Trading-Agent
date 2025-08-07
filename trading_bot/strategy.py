@@ -22,7 +22,7 @@ def compose_strategy(
     summary = " ".join(v.get("summary", "") for v in agent_data.values()).strip()
 
     trend = str(agent_data.get("MarketAnalystAgent", {}).get("market_trend", "")).lower()
-    risk = str(agent_data.get("RiskAdvisorAgent", {}).get("risk_level", "")).lower()
+    # risk = str(agent_data.get("RiskAdvisorAgent", {}).get("risk_level", "")).lower()
 
     signal = "hold"
     rationale: List[str] = []
