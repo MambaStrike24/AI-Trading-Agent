@@ -16,7 +16,10 @@ from datetime import timedelta
 import pandas as pd 
 from typing import Any, Dict
 from trading_bot.indicators.registry import INDICATOR_REGISTRY
+import re 
+from ..storage import JSONStorage
 
+_PLANNER_STORAGE = JSONStorage(base_dir="data")
 
 def _stringify_dates(obj: Any) -> Any:
     if isinstance(obj, dict):
@@ -328,6 +331,7 @@ class IndicatorSelectionAgent(_BaseAgent):
             "date": date,
             **data,
         }
+    
 class StrategyPlannerAgent(_BaseAgent):
     """Plan entry/exit/stop strategy based on strategy_type, indicators, and actual market data."""
 
@@ -399,18 +403,43 @@ class StrategyPlannerAgent(_BaseAgent):
         prompt += "\n\nRespond ONLY in the required JSON format."
 
         raw = openai_client.call_llm(prompt)
+
         # --- sanitize common LLM artifacts before parsing ---
         text = raw.strip()
         text = re.sub(r"^```(?:json)?\s*|\s*```$", "", text)            # drop code fences
         text = re.sub(r"<[^>]+>", "null", text)                         # replace leftover <placeholder>
         text = re.sub(r"\bNaN\b|\binf\b|-inf", "null", text, flags=re.I)# JSON-safe
+        # normalize smart quotes and strip trailing commas
+        text = (text.replace("“", '"').replace("”", '"')
+                    .replace("’", "'").replace("‘", "'"))
+        text = re.sub(r",\s*(?=[}\]])", "", text)
         # ----------------------------------------------------
 
         try:
-            data = json.loads(raw)
+            data = json.loads(text)
         except json.JSONDecodeError:
-            match = re.search(r"\{.*\}", raw, re.DOTALL)
-            data = json.loads(match.group(0)) if match else {}
+            # save raw for debugging when the JSON is malformed
+            try:
+                _PLANNER_STORAGE.save("strategy_raw", symbol, str(date), {"raw_text": text})
+                print(f"[Planner] Malformed JSON for {symbol} {date}, saved strategy_raw.")
+            except Exception:
+                pass  # never let debug IO break the run
+
+            data = {}
+            match = re.search(r"\{.*\}", text, re.DOTALL)
+            if match:
+                candidate = match.group(0)
+                candidate = (candidate.replace("“", '"').replace("”", '"')
+                                      .replace("’", "'").replace("‘", "'"))
+                candidate = re.sub(r",\s*(?=[}\]])", "", candidate)
+                try:
+                    data = json.loads(candidate)
+                except json.JSONDecodeError:
+                    data = {"plan": {}, "parse_warning": "planner JSON malformed"}
+
+        if not isinstance(data, dict):
+            data = {}
+        data.setdefault("plan", {})
 
         return {
             "agent": self.name,

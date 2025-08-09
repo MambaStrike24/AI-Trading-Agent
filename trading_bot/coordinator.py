@@ -69,6 +69,7 @@ class Coordinator:
             interval="1h",
             auto_adjust=True,
             progress=False,
+            multi_level_index = False
         )
         if df.empty:
             ohlcv_data = {"error": "no data"}
